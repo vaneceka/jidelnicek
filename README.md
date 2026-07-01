@@ -4,7 +4,9 @@ Jednoduchá statická webová aplikace pro:
 
 - evidenci více klientů,
 - vytvoření více jídelníčků pro každého klienta,
-- zadávání množství potraviny a makroživin na 100 g,
+- výběr potraviny z přednastaveného katalogu,
+- automatické doplnění makroživin na 100 g,
+- zadávání požadovaného množství potraviny,
 - výpočet celkových bílkovin, tuků, sacharidů a orientační energie,
 - vygenerování zprávy pro klienta,
 - automatické ukládání dat do `localStorage`,

@@ -203,7 +203,7 @@ h2 { margin-bottom: 0; font-size: 1.2rem; }
 
 .field { display: grid; gap: 6px; }
 .field label { color: var(--muted); font-size: .82rem; font-weight: 700; }
-.field input, textarea {
+.field input, .field select, textarea {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -211,7 +211,11 @@ h2 { margin-bottom: 0; font-size: 1.2rem; }
   background: white;
   color: var(--text);
 }
-.field input:focus, textarea:focus {
+.field input[readonly] {
+  background: #eef2f3;
+  color: var(--muted);
+}
+.field input:focus, .field select:focus, textarea:focus {
   outline: 3px solid rgba(40, 95, 85, .14);
   border-color: var(--primary);
 }

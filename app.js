@@ -1,5 +1,26 @@
 const STORAGE_KEY = "makro-kalkulacka-v1";
 
+const FOOD_CATALOG = [
+  { id: "chicken-breast", name: "Kuřecí prsa", proteinPer100: 23.1, fatPer100: 1.9, carbsPer100: 0 },
+  { id: "turkey-breast", name: "Krůtí prsa", proteinPer100: 24, fatPer100: 1.2, carbsPer100: 0 },
+  { id: "salmon", name: "Losos", proteinPer100: 20, fatPer100: 13, carbsPer100: 0 },
+  { id: "tuna", name: "Tuňák ve vlastní šťávě", proteinPer100: 24, fatPer100: 1, carbsPer100: 0 },
+  { id: "egg", name: "Vejce", proteinPer100: 12.6, fatPer100: 10.6, carbsPer100: 1.1 },
+  { id: "cottage", name: "Cottage sýr", proteinPer100: 12, fatPer100: 4.3, carbsPer100: 3 },
+  { id: "skyr", name: "Skyr bílý", proteinPer100: 11, fatPer100: 0.2, carbsPer100: 4 },
+  { id: "greek-yogurt", name: "Řecký jogurt", proteinPer100: 9, fatPer100: 5, carbsPer100: 3.8 },
+  { id: "rice-cooked", name: "Rýže vařená", proteinPer100: 2.7, fatPer100: 0.3, carbsPer100: 28 },
+  { id: "pasta-cooked", name: "Těstoviny vařené", proteinPer100: 5.8, fatPer100: 0.9, carbsPer100: 30.9 },
+  { id: "potatoes", name: "Brambory vařené", proteinPer100: 1.9, fatPer100: 0.1, carbsPer100: 17 },
+  { id: "oats", name: "Ovesné vločky", proteinPer100: 13.5, fatPer100: 7, carbsPer100: 58.7 },
+  { id: "bread", name: "Celozrnný chléb", proteinPer100: 8.5, fatPer100: 3.3, carbsPer100: 43 },
+  { id: "banana", name: "Banán", proteinPer100: 1.1, fatPer100: 0.3, carbsPer100: 22.8 },
+  { id: "apple", name: "Jablko", proteinPer100: 0.3, fatPer100: 0.2, carbsPer100: 13.8 },
+  { id: "avocado", name: "Avokádo", proteinPer100: 2, fatPer100: 14.7, carbsPer100: 8.5 },
+  { id: "almonds", name: "Mandle", proteinPer100: 21.2, fatPer100: 49.9, carbsPer100: 21.6 },
+  { id: "olive-oil", name: "Olivový olej", proteinPer100: 0, fatPer100: 100, carbsPer100: 0 },
+];
+
 const state = loadState();
 
 const elements = {
@@ -14,6 +35,7 @@ const elements = {
   mealPlanTabs: document.querySelector("#mealPlanTabs"),
   mealPlanNameInput: document.querySelector("#mealPlanNameInput"),
   foodForm: document.querySelector("#foodForm"),
+  foodSelect: document.querySelector("#foodSelect"),
   foodTableBody: document.querySelector("#foodTableBody"),
   emptyFoods: document.querySelector("#emptyFoods"),
   totalProtein: document.querySelector("#totalProtein"),
@@ -36,6 +58,7 @@ document.querySelector("#exportButton").addEventListener("click", exportData);
 elements.importInput.addEventListener("change", importData);
 elements.clientForm.addEventListener("submit", addClient);
 elements.foodForm.addEventListener("submit", addFood);
+elements.foodSelect.addEventListener("change", updateSelectedFood);
 elements.clientNameInput.addEventListener("input", updateClientName);
 elements.mealPlanNameInput.addEventListener("input", updateMealPlanName);
 
@@ -181,30 +204,68 @@ function updateMealPlanName(event) {
   renderMessage(false);
 }
 
+function populateFoodCatalog() {
+  const groups = new Map([
+    ["Maso a ryby", ["chicken-breast", "turkey-breast", "salmon", "tuna"]],
+    ["Mléčné výrobky a vejce", ["egg", "cottage", "skyr", "greek-yogurt"]],
+    ["Přílohy a pečivo", ["rice-cooked", "pasta-cooked", "potatoes", "oats", "bread"]],
+    ["Ovoce, ořechy a tuky", ["banana", "apple", "avocado", "almonds", "olive-oil"]],
+  ]);
+
+  groups.forEach((foodIds, label) => {
+    const group = document.createElement("optgroup");
+    group.label = label;
+
+    foodIds.forEach(foodId => {
+      const food = FOOD_CATALOG.find(item => item.id === foodId);
+      if (!food) return;
+
+      const option = document.createElement("option");
+      option.value = food.id;
+      option.textContent = food.name;
+      group.append(option);
+    });
+
+    elements.foodSelect.append(group);
+  });
+}
+
+function selectedCatalogFood() {
+  return FOOD_CATALOG.find(food => food.id === elements.foodSelect.value) ?? null;
+}
+
+function updateSelectedFood() {
+  const food = selectedCatalogFood();
+
+  document.querySelector("#foodProtein").value = food?.proteinPer100 ?? "";
+  document.querySelector("#foodFat").value = food?.fatPer100 ?? "";
+  document.querySelector("#foodCarbs").value = food?.carbsPer100 ?? "";
+}
+
 function addFood(event) {
   event.preventDefault();
   const plan = activeMealPlan();
-  if (!plan) return;
+  const catalogFood = selectedCatalogFood();
+  if (!plan || !catalogFood) return;
 
   const food = {
     id: createId(),
-    name: document.querySelector("#foodName").value.trim(),
+    catalogFoodId: catalogFood.id,
+    name: catalogFood.name,
     amount: numberValue("#foodAmount"),
-    proteinPer100: numberValue("#foodProtein"),
-    fatPer100: numberValue("#foodFat"),
-    carbsPer100: numberValue("#foodCarbs"),
+    proteinPer100: catalogFood.proteinPer100,
+    fatPer100: catalogFood.fatPer100,
+    carbsPer100: catalogFood.carbsPer100,
   };
 
-  if (!food.name || food.amount <= 0) return;
+  if (food.amount <= 0) return;
   plan.foods.push(food);
   saveState();
 
   elements.foodForm.reset();
   document.querySelector("#foodAmount").value = "100";
-  document.querySelector("#foodProtein").value = "0";
-  document.querySelector("#foodFat").value = "0";
-  document.querySelector("#foodCarbs").value = "0";
-  document.querySelector("#foodName").focus();
+  updateSelectedFood();
+  elements.foodSelect.focus();
   renderPlan();
 }
 
@@ -426,4 +487,5 @@ function showToast(message) {
   toastTimer = setTimeout(() => elements.toast.classList.remove("visible"), 2200);
 }
 
+populateFoodCatalog();
 render();
