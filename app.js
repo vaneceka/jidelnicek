@@ -1,0 +1,429 @@
+const STORAGE_KEY = "makro-kalkulacka-v1";
+
+const state = loadState();
+
+const elements = {
+  clientList: document.querySelector("#clientList"),
+  emptyClients: document.querySelector("#emptyClients"),
+  welcomeCard: document.querySelector("#welcomeCard"),
+  clientWorkspace: document.querySelector("#clientWorkspace"),
+  clientDialog: document.querySelector("#clientDialog"),
+  clientForm: document.querySelector("#clientForm"),
+  newClientName: document.querySelector("#newClientName"),
+  clientNameInput: document.querySelector("#clientNameInput"),
+  mealPlanTabs: document.querySelector("#mealPlanTabs"),
+  mealPlanNameInput: document.querySelector("#mealPlanNameInput"),
+  foodForm: document.querySelector("#foodForm"),
+  foodTableBody: document.querySelector("#foodTableBody"),
+  emptyFoods: document.querySelector("#emptyFoods"),
+  totalProtein: document.querySelector("#totalProtein"),
+  totalFat: document.querySelector("#totalFat"),
+  totalCarbs: document.querySelector("#totalCarbs"),
+  totalCalories: document.querySelector("#totalCalories"),
+  messageOutput: document.querySelector("#messageOutput"),
+  importInput: document.querySelector("#importInput"),
+  toast: document.querySelector("#toast"),
+};
+
+document.querySelector("#addClientButton").addEventListener("click", openClientDialog);
+document.querySelector("#welcomeAddClientButton").addEventListener("click", openClientDialog);
+document.querySelector("#cancelClientButton").addEventListener("click", () => elements.clientDialog.close());
+document.querySelector("#deleteClientButton").addEventListener("click", deleteActiveClient);
+document.querySelector("#addMealPlanButton").addEventListener("click", addMealPlan);
+document.querySelector("#deleteMealPlanButton").addEventListener("click", deleteActiveMealPlan);
+document.querySelector("#copyMessageButton").addEventListener("click", copyMessage);
+document.querySelector("#exportButton").addEventListener("click", exportData);
+elements.importInput.addEventListener("change", importData);
+elements.clientForm.addEventListener("submit", addClient);
+elements.foodForm.addEventListener("submit", addFood);
+elements.clientNameInput.addEventListener("input", updateClientName);
+elements.mealPlanNameInput.addEventListener("input", updateMealPlanName);
+
+function createId() {
+  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+}
+
+function defaultState() {
+  return {
+    clients: [],
+    activeClientId: null,
+    activeMealPlanId: null,
+  };
+}
+
+function loadState() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return stored && Array.isArray(stored.clients) ? stored : defaultState();
+  } catch {
+    return defaultState();
+  }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function activeClient() {
+  return state.clients.find(client => client.id === state.activeClientId) ?? null;
+}
+
+function activeMealPlan() {
+  const client = activeClient();
+  return client?.mealPlans.find(plan => plan.id === state.activeMealPlanId) ?? null;
+}
+
+function openClientDialog() {
+  elements.newClientName.value = "";
+  elements.clientDialog.showModal();
+  setTimeout(() => elements.newClientName.focus(), 0);
+}
+
+function addClient(event) {
+  event.preventDefault();
+  const name = elements.newClientName.value.trim();
+  if (!name) return;
+
+  const planId = createId();
+  const client = {
+    id: createId(),
+    name,
+    mealPlans: [{
+      id: planId,
+      name: "Jídelníček 1",
+      foods: [],
+      customMessage: "",
+    }],
+  };
+
+  state.clients.push(client);
+  state.activeClientId = client.id;
+  state.activeMealPlanId = planId;
+  saveState();
+  elements.clientDialog.close();
+  render();
+}
+
+function deleteActiveClient() {
+  const client = activeClient();
+  if (!client || !confirm(`Opravdu chcete smazat klienta „${client.name}“?`)) return;
+
+  state.clients = state.clients.filter(item => item.id !== client.id);
+  const nextClient = state.clients[0] ?? null;
+  state.activeClientId = nextClient?.id ?? null;
+  state.activeMealPlanId = nextClient?.mealPlans[0]?.id ?? null;
+  saveState();
+  render();
+}
+
+function selectClient(clientId) {
+  const client = state.clients.find(item => item.id === clientId);
+  state.activeClientId = clientId;
+  state.activeMealPlanId = client?.mealPlans[0]?.id ?? null;
+  saveState();
+  render();
+}
+
+function addMealPlan() {
+  const client = activeClient();
+  if (!client) return;
+
+  const plan = {
+    id: createId(),
+    name: `Jídelníček ${client.mealPlans.length + 1}`,
+    foods: [],
+    customMessage: "",
+  };
+  client.mealPlans.push(plan);
+  state.activeMealPlanId = plan.id;
+  saveState();
+  render();
+}
+
+function deleteActiveMealPlan() {
+  const client = activeClient();
+  const plan = activeMealPlan();
+  if (!client || !plan) return;
+
+  if (client.mealPlans.length === 1) {
+    showToast("Klient musí mít alespoň jeden jídelníček.");
+    return;
+  }
+  if (!confirm(`Opravdu chcete smazat „${plan.name}“?`)) return;
+
+  client.mealPlans = client.mealPlans.filter(item => item.id !== plan.id);
+  state.activeMealPlanId = client.mealPlans[0].id;
+  saveState();
+  render();
+}
+
+function selectMealPlan(planId) {
+  state.activeMealPlanId = planId;
+  saveState();
+  render();
+}
+
+function updateClientName(event) {
+  const client = activeClient();
+  if (!client) return;
+  client.name = event.target.value;
+  saveState();
+  renderClientList();
+  renderMessage(false);
+}
+
+function updateMealPlanName(event) {
+  const plan = activeMealPlan();
+  if (!plan) return;
+  plan.name = event.target.value;
+  saveState();
+  renderMealPlanTabs();
+  renderMessage(false);
+}
+
+function addFood(event) {
+  event.preventDefault();
+  const plan = activeMealPlan();
+  if (!plan) return;
+
+  const food = {
+    id: createId(),
+    name: document.querySelector("#foodName").value.trim(),
+    amount: numberValue("#foodAmount"),
+    proteinPer100: numberValue("#foodProtein"),
+    fatPer100: numberValue("#foodFat"),
+    carbsPer100: numberValue("#foodCarbs"),
+  };
+
+  if (!food.name || food.amount <= 0) return;
+  plan.foods.push(food);
+  saveState();
+
+  elements.foodForm.reset();
+  document.querySelector("#foodAmount").value = "100";
+  document.querySelector("#foodProtein").value = "0";
+  document.querySelector("#foodFat").value = "0";
+  document.querySelector("#foodCarbs").value = "0";
+  document.querySelector("#foodName").focus();
+  renderPlan();
+}
+
+function deleteFood(foodId) {
+  const plan = activeMealPlan();
+  if (!plan) return;
+  plan.foods = plan.foods.filter(food => food.id !== foodId);
+  saveState();
+  renderPlan();
+}
+
+function numberValue(selector) {
+  return Number.parseFloat(document.querySelector(selector).value) || 0;
+}
+
+function calculateFood(food) {
+  const ratio = food.amount / 100;
+  return {
+    protein: food.proteinPer100 * ratio,
+    fat: food.fatPer100 * ratio,
+    carbs: food.carbsPer100 * ratio,
+  };
+}
+
+function calculateTotals(plan) {
+  const totals = plan.foods.reduce((sum, food) => {
+    const calculated = calculateFood(food);
+    sum.protein += calculated.protein;
+    sum.fat += calculated.fat;
+    sum.carbs += calculated.carbs;
+    return sum;
+  }, { protein: 0, fat: 0, carbs: 0 });
+
+  totals.calories = totals.protein * 4 + totals.carbs * 4 + totals.fat * 9;
+  return totals;
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat("cs-CZ", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 0,
+  }).format(value);
+}
+
+function generateMessage() {
+  const client = activeClient();
+  const plan = activeMealPlan();
+  if (!client || !plan) return "";
+
+  const totals = calculateTotals(plan);
+  const rows = plan.foods.map(food => {
+    const macros = calculateFood(food);
+    return `• ${food.name}: ${formatNumber(food.amount)} g — B ${formatNumber(macros.protein)} g, T ${formatNumber(macros.fat)} g, S ${formatNumber(macros.carbs)} g`;
+  });
+
+  return [
+    `Dobrý den${client.name ? `, ${client.name}` : ""},`,
+    "",
+    `posílám přehled jídelníčku „${plan.name}“:`,
+    "",
+    ...(rows.length ? rows : ["• Jídelníček zatím neobsahuje žádné položky."]),
+    "",
+    "Celkem:",
+    `Bílkoviny: ${formatNumber(totals.protein)} g`,
+    `Tuky: ${formatNumber(totals.fat)} g`,
+    `Sacharidy: ${formatNumber(totals.carbs)} g`,
+    `Orientační energetická hodnota: ${formatNumber(totals.calories)} kcal`,
+    "",
+    "S pozdravem",
+  ].join("\n");
+}
+
+function render() {
+  renderClientList();
+
+  const client = activeClient();
+  elements.welcomeCard.hidden = Boolean(client);
+  elements.clientWorkspace.hidden = !client;
+
+  if (!client) return;
+
+  if (!activeMealPlan()) {
+    state.activeMealPlanId = client.mealPlans[0]?.id ?? null;
+  }
+
+  elements.clientNameInput.value = client.name;
+  renderMealPlanTabs();
+  renderPlan();
+}
+
+function renderClientList() {
+  elements.clientList.innerHTML = "";
+  elements.emptyClients.hidden = state.clients.length > 0;
+
+  state.clients.forEach(client => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `client-item${client.id === state.activeClientId ? " active" : ""}`;
+    button.textContent = client.name || "Klient bez názvu";
+    button.addEventListener("click", () => selectClient(client.id));
+    elements.clientList.append(button);
+  });
+}
+
+function renderMealPlanTabs() {
+  const client = activeClient();
+  elements.mealPlanTabs.innerHTML = "";
+  if (!client) return;
+
+  client.mealPlans.forEach(plan => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `tab${plan.id === state.activeMealPlanId ? " active" : ""}`;
+    button.textContent = plan.name || "Jídelníček";
+    button.addEventListener("click", () => selectMealPlan(plan.id));
+    elements.mealPlanTabs.append(button);
+  });
+}
+
+function renderPlan() {
+  const plan = activeMealPlan();
+  if (!plan) return;
+
+  elements.mealPlanNameInput.value = plan.name;
+  elements.foodTableBody.innerHTML = "";
+  elements.emptyFoods.hidden = plan.foods.length > 0;
+
+  plan.foods.forEach(food => {
+    const macros = calculateFood(food);
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${escapeHtml(food.name)}</td>
+      <td>${formatNumber(food.amount)} g</td>
+      <td>${formatNumber(macros.protein)} g</td>
+      <td>${formatNumber(macros.fat)} g</td>
+      <td>${formatNumber(macros.carbs)} g</td>
+      <td><button class="delete-row" type="button" aria-label="Smazat ${escapeHtml(food.name)}">Smazat</button></td>
+    `;
+    row.querySelector("button").addEventListener("click", () => deleteFood(food.id));
+    elements.foodTableBody.append(row);
+  });
+
+  const totals = calculateTotals(plan);
+  elements.totalProtein.textContent = `${formatNumber(totals.protein)} g`;
+  elements.totalFat.textContent = `${formatNumber(totals.fat)} g`;
+  elements.totalCarbs.textContent = `${formatNumber(totals.carbs)} g`;
+  elements.totalCalories.textContent = `${formatNumber(totals.calories)} kcal`;
+  renderMessage(true);
+}
+
+function renderMessage(force) {
+  const plan = activeMealPlan();
+  if (!plan) return;
+  if (force || !elements.messageOutput.matches(":focus")) {
+    elements.messageOutput.value = generateMessage();
+  }
+}
+
+async function copyMessage() {
+  try {
+    await navigator.clipboard.writeText(elements.messageOutput.value);
+    showToast("Zpráva byla zkopírována.");
+  } catch {
+    elements.messageOutput.select();
+    document.execCommand("copy");
+    showToast("Zpráva byla zkopírována.");
+  }
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `makro-kalkulacka-${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function importData(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const imported = JSON.parse(reader.result);
+      if (!imported || !Array.isArray(imported.clients)) throw new Error();
+
+      state.clients = imported.clients;
+      state.activeClientId = imported.activeClientId ?? imported.clients[0]?.id ?? null;
+      const client = activeClient();
+      state.activeMealPlanId = imported.activeMealPlanId ?? client?.mealPlans[0]?.id ?? null;
+      saveState();
+      render();
+      showToast("Data byla úspěšně importována.");
+    } catch {
+      showToast("Soubor nemá správný formát.");
+    } finally {
+      elements.importInput.value = "";
+    }
+  };
+  reader.readAsText(file);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+let toastTimer;
+function showToast(message) {
+  clearTimeout(toastTimer);
+  elements.toast.textContent = message;
+  elements.toast.classList.add("visible");
+  toastTimer = setTimeout(() => elements.toast.classList.remove("visible"), 2200);
+}
+
+render();
