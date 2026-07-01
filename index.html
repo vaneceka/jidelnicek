@@ -69,9 +69,11 @@
           <form id="foodForm" class="food-form">
             <div class="field wide">
               <label for="foodSelect">Potravina / jídlo</label>
-              <select id="foodSelect" required>
-                <option value="">Vyberte potravinu</option>
-              </select>
+              <div class="select-wrapper">
+                <select id="foodSelect" required>
+                  <option value="">Vyberte potravinu</option>
+                </select>
+              </div>
             </div>
             <div class="field">
               <label for="foodAmount">Množství (g)</label>
@@ -90,6 +92,14 @@
               <input id="foodCarbs" type="number" readonly>
             </div>
             <button class="button primary add-food-button" type="submit">Přidat položku</button>
+
+            <div id="foodPreview" class="food-preview" hidden>
+              <span>Pro zadané množství:</span>
+              <strong id="previewProtein">B 0 g</strong>
+              <strong id="previewFat">T 0 g</strong>
+              <strong id="previewCarbs">S 0 g</strong>
+              <strong id="previewCalories">0 kcal</strong>
+            </div>
           </form>
 
           <div class="table-wrap">

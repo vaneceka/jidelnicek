@@ -36,6 +36,11 @@ const elements = {
   mealPlanNameInput: document.querySelector("#mealPlanNameInput"),
   foodForm: document.querySelector("#foodForm"),
   foodSelect: document.querySelector("#foodSelect"),
+  foodPreview: document.querySelector("#foodPreview"),
+  previewProtein: document.querySelector("#previewProtein"),
+  previewFat: document.querySelector("#previewFat"),
+  previewCarbs: document.querySelector("#previewCarbs"),
+  previewCalories: document.querySelector("#previewCalories"),
   foodTableBody: document.querySelector("#foodTableBody"),
   emptyFoods: document.querySelector("#emptyFoods"),
   totalProtein: document.querySelector("#totalProtein"),
@@ -59,6 +64,7 @@ elements.importInput.addEventListener("change", importData);
 elements.clientForm.addEventListener("submit", addClient);
 elements.foodForm.addEventListener("submit", addFood);
 elements.foodSelect.addEventListener("change", updateSelectedFood);
+document.querySelector("#foodAmount").addEventListener("input", updateFoodPreview);
 elements.clientNameInput.addEventListener("input", updateClientName);
 elements.mealPlanNameInput.addEventListener("input", updateMealPlanName);
 
@@ -240,6 +246,29 @@ function updateSelectedFood() {
   document.querySelector("#foodProtein").value = food?.proteinPer100 ?? "";
   document.querySelector("#foodFat").value = food?.fatPer100 ?? "";
   document.querySelector("#foodCarbs").value = food?.carbsPer100 ?? "";
+  updateFoodPreview();
+}
+
+function updateFoodPreview() {
+  const food = selectedCatalogFood();
+  const amount = numberValue("#foodAmount");
+
+  if (!food || amount <= 0) {
+    elements.foodPreview.hidden = true;
+    return;
+  }
+
+  const ratio = amount / 100;
+  const protein = food.proteinPer100 * ratio;
+  const fat = food.fatPer100 * ratio;
+  const carbs = food.carbsPer100 * ratio;
+  const calories = protein * 4 + carbs * 4 + fat * 9;
+
+  elements.previewProtein.textContent = `B ${formatNumber(protein)} g`;
+  elements.previewFat.textContent = `T ${formatNumber(fat)} g`;
+  elements.previewCarbs.textContent = `S ${formatNumber(carbs)} g`;
+  elements.previewCalories.textContent = `${formatNumber(calories)} kcal`;
+  elements.foodPreview.hidden = false;
 }
 
 function addFood(event) {
